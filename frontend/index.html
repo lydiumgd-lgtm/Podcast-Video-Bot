@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<body>
+    <h2>Upload PDF</h2>
+    <input type="file" id="fileInput" />
+    <button onclick="uploadPDF()">Process</button>
+
+    <pre id="output"></pre>
+
+<script>
+async function uploadPDF() {
+    const file = document.getElementById("fileInput").files[0];
+    if (!file) {
+        alert("Choose a file first!");
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch("/api/extract_text", {
+        method: "POST",
+        body: formData
+    });
+
+    const data = await res.json();
+    document.getElementById("output").textContent = data.text || data.error;
+}
+</script>
+</body>
+</html>
