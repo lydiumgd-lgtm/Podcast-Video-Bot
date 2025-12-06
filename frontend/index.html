@@ -10,22 +10,23 @@
 <script>
 async function uploadPDF() {
     const file = document.getElementById("fileInput").files[0];
-    if (!file) {
-        alert("Choose a file first!");
-        return;
-    }
+    if (!file) return alert("Choose a file first!");
 
-    const formData = new FormData();
-    formData.append("file", file);
+    // Convert file → base64 manually
+    const arrayBuffer = await file.arrayBuffer();
+    const binary = String.fromCharCode(...new Uint8Array(arrayBuffer));
+    const base64String = btoa(binary);
 
     const res = await fetch("/api/extract_text", {
         method: "POST",
-        body: formData
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file: base64String })
     });
 
     const data = await res.json();
     document.getElementById("output").textContent = data.text || data.error;
 }
 </script>
+
 </body>
 </html>
