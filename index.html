@@ -1,38 +1,249 @@
 <!DOCTYPE html>
 <html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Podcast Video Bot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .upload-section {
+            border: 2px dashed #ccc;
+            padding: 30px;
+            text-align: center;
+            border-radius: 10px;
+        }
+        button {
+            background: #0070f3;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .progress {
+            display: none;
+            margin-top: 20px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #f0f0f0;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #0070f3;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        .status {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
+        .success {
+            color: green;
+            margin-top: 10px;
+        }
+        #output {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            display: none;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .file-info {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
 <body>
-    <h2>Upload PDF</h2>
-    <input type="file" id="fileInput" />
-    <button onclick="uploadPDF()">Process</button>
+    <h1>🎙️ Podcast Video Bot</h1>
+    <p>Upload a podcast transcript PDF to get started</p>
+    
+    <div class="upload-section">
+        <h2>Upload PDF</h2>
+        <input type="file" id="fileInput" accept=".pdf" />
+        <div class="file-info" id="fileInfo"></div>
+        <button onclick="uploadPDF()" id="uploadBtn">Process PDF</button>
+    </div>
 
+    <div class="progress" id="progress">
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill">0%</div>
+        </div>
+        <div class="status" id="status">Preparing...</div>
+    </div>
+
+    <div id="message"></div>
     <pre id="output"></pre>
 
 <script>
+// File size limit (4MB for safety - Vercel has 4.5MB limit)
+const MAX_FILE_SIZE = 4 * 1024 * 1024;
+
+// Show file info when selected
+document.getElementById('fileInput').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    const fileInfo = document.getElementById('fileInfo');
+    
+    if (file) {
+        const sizeMB = (file.size / 1024 / 1024).toFixed(2);
+        fileInfo.textContent = `Selected: ${file.name} (${sizeMB} MB)`;
+        
+        if (file.size > MAX_FILE_SIZE) {
+            fileInfo.style.color = 'red';
+            fileInfo.textContent += ' - WARNING: File too large! Max 4MB';
+        } else {
+            fileInfo.style.color = '#666';
+        }
+    }
+});
+
 async function uploadPDF() {
-    const file = document.getElementById("fileInput").files[0];
-    if (!file) return alert("Choose a file first!");
-
-    // Convert PDF → base64 safely using FileReader
-    const base64String = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-            const base64 = reader.result.split(",")[1]; // remove prefix
-            resolve(base64);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-    });
-
-    const res = await fetch("/api/extract_text", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ file: base64String })
-    });
-
-    const data = await res.json();
-    document.getElementById("output").textContent = data.text || data.error;
+    const fileInput = document.getElementById("fileInput");
+    const file = fileInput.files[0];
+    const uploadBtn = document.getElementById("uploadBtn");
+    const progress = document.getElementById("progress");
+    const progressFill = document.getElementById("progressFill");
+    const status = document.getElementById("status");
+    const message = document.getElementById("message");
+    const output = document.getElementById("output");
+    
+    // Reset UI
+    message.innerHTML = '';
+    output.style.display = 'none';
+    output.textContent = '';
+    
+    // Validation
+    if (!file) {
+        message.innerHTML = '<div class="error">❌ Please choose a PDF file first!</div>';
+        return;
+    }
+    
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+        message.innerHTML = '<div class="error">❌ Please upload a PDF file!</div>';
+        return;
+    }
+    
+    if (file.size > MAX_FILE_SIZE) {
+        message.innerHTML = '<div class="error">❌ File too large! Maximum size is 4MB.<br>Try compressing your PDF or splitting it into smaller files.</div>';
+        return;
+    }
+    
+    // Disable button and show progress
+    uploadBtn.disabled = true;
+    progress.style.display = 'block';
+    progressFill.style.width = '10%';
+    progressFill.textContent = '10%';
+    status.textContent = 'Reading PDF file...';
+    
+    try {
+        // Convert PDF to base64
+        progressFill.style.width = '30%';
+        progressFill.textContent = '30%';
+        status.textContent = 'Encoding file...';
+        
+        const base64String = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const base64 = reader.result.split(",")[1];
+                resolve(base64);
+            };
+            reader.onerror = () => reject(new Error('Failed to read file'));
+            reader.readAsDataURL(file);
+        });
+        
+        // Send to backend with timeout
+        progressFill.style.width = '50%';
+        progressFill.textContent = '50%';
+        status.textContent = 'Extracting text from PDF...';
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout
+        
+        const res = await fetch("/api/extract_text", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ file: base64String }),
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        progressFill.style.width = '80%';
+        progressFill.textContent = '80%';
+        status.textContent = 'Processing response...';
+        
+        const data = await res.json();
+        
+        progressFill.style.width = '100%';
+        progressFill.textContent = '100%';
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        if (!data.text || data.text.trim() === '') {
+            throw new Error('No text extracted from PDF. The PDF might be scanned images or empty.');
+        }
+        
+        // Success!
+        status.textContent = '✅ Complete!';
+        message.innerHTML = `<div class="success">✅ Successfully extracted ${data.text.length} characters from PDF!</div>`;
+        output.style.display = 'block';
+        output.textContent = data.text;
+        
+        // Hide progress after 2 seconds
+        setTimeout(() => {
+            progress.style.display = 'none';
+        }, 2000);
+        
+    } catch (error) {
+        progressFill.style.width = '100%';
+        progressFill.style.background = '#ff4444';
+        progressFill.textContent = 'Error';
+        
+        let errorMsg = error.message;
+        
+        if (error.name === 'AbortError') {
+            errorMsg = 'Request timeout. Your PDF is too large or complex to process. Try a smaller file.';
+        }
+        
+        status.textContent = '❌ Failed';
+        message.innerHTML = `<div class="error">❌ Error: ${errorMsg}</div>`;
+        
+        console.error('Upload error:', error);
+    } finally {
+        uploadBtn.disabled = false;
+    }
 }
 </script>
-
 </body>
 </html>
