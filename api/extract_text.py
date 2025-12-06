@@ -2,40 +2,33 @@ from http.server import BaseHTTPRequestHandler
 import json
 import PyPDF2
 import io
+import base64
 
 class handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         try:
-            # Read raw bytes
+            # Read body
             content_length = int(self.headers['Content-Length'])
             body = self.rfile.read(content_length)
+            data = json.loads(body)
 
-            # Extract file from multipart form
-            import cgi
-            env = {'REQUEST_METHOD':'POST'}
-            fs = cgi.FieldStorage(
-                fp=io.BytesIO(body),
-                headers=self.headers,
-                environ=env
-            )
-
-            if 'file' not in fs:
-                self.send_error(400, "No file uploaded")
+            if "file" not in data:
+                self.send_error(400, "Missing 'file' in JSON")
                 return
 
-            file_item = fs['file']
-            pdf_bytes = file_item.file.read()
+            # Decode base64 → bytes
+            pdf_bytes = base64.b64decode(data["file"])
 
-            # Read PDF
+            # Extract text
             reader = PyPDF2.PdfReader(io.BytesIO(pdf_bytes))
             all_text = ""
             for page in reader.pages:
-                text = page.extract_text()
-                if text:
-                    all_text += text + "\n"
+                t = page.extract_text()
+                if t:
+                    all_text += t + "\n"
 
-            # Response
+            # Response OK
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
