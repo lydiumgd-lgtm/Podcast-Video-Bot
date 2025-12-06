@@ -12,12 +12,17 @@ async function uploadPDF() {
     const file = document.getElementById("fileInput").files[0];
     if (!file) return alert("Choose a file first!");
 
-    // Convert file → base64 manually
-    const arrayBuffer = await file.arrayBuffer();
-    const binary = String.fromCharCode(...new Uint8Array(arrayBuffer));
-    const base64String = btoa(binary);
+    // Convert PDF → base64 safely using FileReader
+    const base64String = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const base64 = reader.result.split(",")[1]; // remove prefix
+            resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
 
-    console.log("BASE64 LENGTH:", base64String.length);
     const res = await fetch("/api/extract_text", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
