@@ -22,6 +22,10 @@ class handler(BaseHTTPRequestHandler):
             batch_index = data.get("batch_index", 0)
             batch_size = data.get("batch_size", 5)  # 5 parts per batch (TTS is slower)
             
+            # Voice settings (with defaults)
+            voice_lang = data.get("voice_lang", "tl")  # Language code (tl=Tagalog, en=English, etc.)
+            voice_speed = data.get("voice_speed", False)  # False=normal, True=slow
+            
             if not isinstance(parts, list):
                 self.send_error_response(400, "'parts' must be an array")
                 return
@@ -54,7 +58,7 @@ class handler(BaseHTTPRequestHandler):
                 
                 try:
                     print(f"Generating audio for part {actual_index + 1}/{len(parts)}...", file=sys.stderr)
-                    audio_data = self.generate_audio(part)
+                    audio_data = self.generate_audio(part, voice_lang, voice_speed)
                     audio_batch.append(audio_data)
                     print(f"Part {actual_index + 1} audio generated: {audio_data['duration']:.1f}s, {audio_data['size']} bytes", file=sys.stderr)
                 except Exception as e:
@@ -87,16 +91,39 @@ class handler(BaseHTTPRequestHandler):
         except Exception as e:
             self.send_error_response(500, f"Unexpected error: {str(e)}")
     
-    def generate_audio(self, text):
+    def generate_audio(self, text, lang='tl', slow=False):
         """
-        Generate Filipino audio from text using gTTS.
+        Generate audio from text using gTTS.
+        Args:
+            text: Text to convert to speech
+            lang: Language code (tl=Tagalog, en=English, etc.)
+            slow: If True, speaks slower
         Returns dict with base64 audio data and metadata.
         """
         from gtts import gTTS
         from pydub import AudioSegment
         
-        # Create gTTS object for Filipino/Tagalog
-        tts = gTTS(text=text, lang='tl', slow=False)
+        # Validate language code
+        valid_langs = {
+            'tl': 'Tagalog (Filipino)',
+            'en': 'English',
+            'es': 'Spanish',
+            'fr': 'French',
+            'de': 'German',
+            'it': 'Italian',
+            'pt': 'Portuguese',
+            'ja': 'Japanese',
+            'ko': 'Korean',
+            'zh': 'Chinese',
+            'hi': 'Hindi',
+            'ar': 'Arabic'
+        }
+        
+        if lang not in valid_langs:
+            lang = 'tl'  # Default to Tagalog if invalid
+        
+        # Create gTTS object with selected language and speed
+        tts = gTTS(text=text, lang=lang, slow=slow)
         
         # Save to BytesIO buffer
         audio_buffer = io.BytesIO()

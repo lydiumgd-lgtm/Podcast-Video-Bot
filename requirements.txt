@@ -4,3 +4,5 @@ pillow==10.1.0
 requests==2.31.0
 googletrans==4.0.0rc1
 pydub==0.25.1
+imageio==2.34.0
+imageio-ffmpeg==0.5.1
