@@ -180,6 +180,34 @@
             line-height: 1.6;
             color: #333;
         }
+        .audio-card {
+            background: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        .audio-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #28a745;
+        }
+        .audio-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #28a745;
+        }
+        .audio-meta {
+            font-size: 12px;
+            color: #666;
+        }
+        .audio-player {
+            width: 100%;
+            margin-top: 10px;
+        }
         .collapsed {
             display: none;
         }
@@ -280,7 +308,28 @@
             </div>
         </div>
         <div id="translationsContainer"></div>
-        <button onclick="nextStep()" class="secondary">Continue to Audio Generation →</button>
+        <button onclick="generateAudio()" id="audioBtn" class="secondary">Generate Audio Narration →</button>
+    </div>
+
+    <!-- Step 5: View Audio Files -->
+    <div class="section" id="audioSection">
+        <h2>✅ Step 4 Complete: Audio Generated</h2>
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="audioCount">0</div>
+                <div class="stat-label">Audio Files</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalDuration">0</div>
+                <div class="stat-label">Total Minutes</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalSize">0</div>
+                <div class="stat-label">Total MB</div>
+            </div>
+        </div>
+        <div id="audioContainer"></div>
+        <button onclick="nextStep()" class="secondary">Continue to Video Creation →</button>
     </div>
 
 <script>
@@ -288,6 +337,7 @@ const MAX_FILE_SIZE = 4 * 1024 * 1024;
 let extractedText = '';
 let storyParts = [];
 let translatedParts = [];
+let audioFiles = [];
 
 // Show file info when selected
 document.getElementById('fileInput').addEventListener('change', function(e) {
