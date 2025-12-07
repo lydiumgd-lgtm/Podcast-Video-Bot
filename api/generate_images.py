@@ -100,7 +100,8 @@ class handler(BaseHTTPRequestHandler):
         
         # Use HuggingFace Inference API (free, no API key required for public models)
         # Using runwayml/stable-diffusion-v1-5 or stabilityai/stable-diffusion-2-1
-        api_url = "https://api-inference.huggingface.co/models/runwayml/stable-diffusion-v1-5"
+        # Updated to use new router endpoint
+        api_url = "https://router.huggingface.co/models/runwayml/stable-diffusion-v1-5"
         
         headers = {
             "Content-Type": "application/json"
@@ -134,8 +135,13 @@ class handler(BaseHTTPRequestHandler):
                 error_data = response.json()
                 if "error" in error_data:
                     error_msg = error_data["error"]
+                elif "message" in error_data:
+                    error_msg = error_data["message"]
+                # Log full response for debugging
+                print(f"API error response: {error_data}", file=sys.stderr)
             except:
-                pass
+                # If not JSON, log the raw response
+                print(f"API error response (non-JSON): {response.text[:200]}", file=sys.stderr)
             raise Exception(f"HuggingFace API error: {error_msg}")
         
         # Get image bytes
