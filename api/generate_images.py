@@ -92,42 +92,31 @@ class handler(BaseHTTPRequestHandler):
     
     def generate_image(self, text, part_number):
         """
-        Generate AI image from text using HuggingFace Stable Diffusion API (free).
+        Generate AI image from text using Pollinations.ai (free, no API key required).
         Returns dict with base64 image data and metadata.
         """
         # Extract key elements from text for prompt generation
         prompt = self.create_prompt_from_text(text, part_number)
         
-        # Use HuggingFace Inference API (free, no API key required for public models)
-        # Using runwayml/stable-diffusion-v1-5 or stabilityai/stable-diffusion-2-1
-        # Updated to use new router endpoint
-        api_url = "https://router.huggingface.co/models/runwayml/stable-diffusion-v1-5"
+        # Use Pollinations.ai - completely free, no API key needed
+        # API format: https://image.pollinations.ai/prompt/{prompt}?width={width}&height={height}
+        # URL encode the prompt
+        import urllib.parse
+        encoded_prompt = urllib.parse.quote(prompt)
         
-        headers = {
-            "Content-Type": "application/json"
-        }
-        
-        payload = {
-            "inputs": prompt,
-            "parameters": {
-                "num_inference_steps": 30,  # Lower for faster generation
-                "guidance_scale": 7.5,
-                "width": 1080,
-                "height": 1920  # 9:16 vertical format for short videos
-            }
-        }
+        # Pollinations.ai API endpoint
+        api_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1080&height=1920&model=flux&nologo=true"
         
         print(f"Requesting image with prompt: {prompt[:100]}...", file=sys.stderr)
+        print(f"API URL: {api_url[:150]}...", file=sys.stderr)
         
-        # Make request with timeout
-        response = requests.post(api_url, headers=headers, json=payload, timeout=20)
-        
-        if response.status_code == 503:
-            # Model is loading, wait a bit and retry once
-            print("Model loading, waiting 5 seconds...", file=sys.stderr)
-            import time
-            time.sleep(5)
-            response = requests.post(api_url, headers=headers, json=payload, timeout=20)
+        # Make request with timeout (Pollinations can be slow, so longer timeout)
+        try:
+            response = requests.get(api_url, timeout=30, stream=True)
+        except requests.exceptions.Timeout:
+            # Retry once with longer timeout
+            print("Request timed out, retrying...", file=sys.stderr)
+            response = requests.get(api_url, timeout=45, stream=True)
         
         if response.status_code != 200:
             error_msg = f"API returned status {response.status_code}"
@@ -137,14 +126,12 @@ class handler(BaseHTTPRequestHandler):
                     error_msg = error_data["error"]
                 elif "message" in error_data:
                     error_msg = error_data["message"]
-                # Log full response for debugging
                 print(f"API error response: {error_data}", file=sys.stderr)
             except:
-                # If not JSON, log the raw response
                 print(f"API error response (non-JSON): {response.text[:200]}", file=sys.stderr)
-            raise Exception(f"HuggingFace API error: {error_msg}")
+            raise Exception(f"Pollinations.ai API error: {error_msg}")
         
-        # Get image bytes
+        # Get image bytes (Pollinations returns image directly)
         image_bytes = response.content
         
         # Validate it's actually an image
