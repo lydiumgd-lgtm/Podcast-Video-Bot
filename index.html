@@ -474,6 +474,7 @@
     </div>
 
 <script>
+// Global variables
 const MAX_FILE_SIZE = 4 * 1024 * 1024;
 let extractedText = '';
 let storyParts = [];
@@ -485,26 +486,44 @@ let metadata = null;
 let longVideo = null;
 let thumbnail = null;
 
-// Show file info when selected
-document.getElementById('fileInput').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    const fileInfo = document.getElementById('fileInfo');
-    
-    if (file) {
-        const sizeMB = (file.size / 1024 / 1024).toFixed(2);
-        fileInfo.textContent = `Selected: ${file.name} (${sizeMB} MB)`;
-        
-        if (file.size > MAX_FILE_SIZE) {
-            fileInfo.style.color = 'red';
-            fileInfo.textContent += ' - WARNING: File too large! Max 4MB';
-        } else {
-            fileInfo.style.color = '#666';
-        }
+// Wait for DOM to be ready before setting up event listeners
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    // DOM is already ready
+    init();
+}
+
+function init() {
+    // Show file info when selected
+    const fileInput = document.getElementById('fileInput');
+    if (fileInput) {
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const fileInfo = document.getElementById('fileInfo');
+            
+            if (file && fileInfo) {
+                const sizeMB = (file.size / 1024 / 1024).toFixed(2);
+                fileInfo.textContent = `Selected: ${file.name} (${sizeMB} MB)`;
+                
+                if (file.size > MAX_FILE_SIZE) {
+                    fileInfo.style.color = 'red';
+                    fileInfo.textContent += ' - WARNING: File too large! Max 4MB';
+                } else {
+                    fileInfo.style.color = '#666';
+                }
+            }
+        });
     }
-});
+}
 
 async function uploadPDF() {
     const fileInput = document.getElementById("fileInput");
+    if (!fileInput) {
+        console.error('fileInput element not found');
+        return;
+    }
+    
     const file = fileInput.files[0];
     const uploadBtn = document.getElementById("uploadBtn");
     const progress = document.getElementById("progress");
@@ -512,10 +531,17 @@ async function uploadPDF() {
     const status = document.getElementById("status");
     const message = document.getElementById("message");
     
+    if (!uploadBtn || !progress || !progressFill || !status || !message) {
+        console.error('Required UI elements not found');
+        return;
+    }
+    
     // Reset UI
     message.innerHTML = '';
-    document.getElementById('extractedSection').classList.remove('active');
-    document.getElementById('partsSection').classList.remove('active');
+    const extractedSection = document.getElementById('extractedSection');
+    const partsSection = document.getElementById('partsSection');
+    if (extractedSection) extractedSection.classList.remove('active');
+    if (partsSection) partsSection.classList.remove('active');
     
     // Validation
     if (!file) {
@@ -588,12 +614,17 @@ async function uploadPDF() {
         extractedText = data.text;
         
         // Update stats
-        document.getElementById('charCount').textContent = data.characters.toLocaleString();
-        document.getElementById('wordCount').textContent = Math.round(data.characters / 5).toLocaleString();
-        document.getElementById('extractedText').textContent = data.text;
+        const charCountEl = document.getElementById('charCount');
+        const wordCountEl = document.getElementById('wordCount');
+        const extractedTextEl = document.getElementById('extractedText');
+        const extractedSectionEl = document.getElementById('extractedSection');
+        
+        if (charCountEl) charCountEl.textContent = data.characters.toLocaleString();
+        if (wordCountEl) wordCountEl.textContent = Math.round(data.characters / 5).toLocaleString();
+        if (extractedTextEl) extractedTextEl.textContent = data.text;
         
         // Show extracted section
-        document.getElementById('extractedSection').classList.add('active');
+        if (extractedSectionEl) extractedSectionEl.classList.add('active');
         
         message.innerHTML = `<div class="success">✅ Successfully extracted text from ${data.pages} pages!</div>`;
         
