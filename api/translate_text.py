@@ -62,52 +62,126 @@ class handler(BaseHTTPRequestHandler):
     def translate_text(self, text):
         """
         Translate English text to Filipino (Tagalog).
-        Uses HuggingFace Inference API (free tier).
+        Uses multiple fallback methods for reliability.
         """
         import requests
         
-        # HuggingFace Inference API endpoint (free, no API key needed for public models)
-        API_URL = "https://api-inference.huggingface.co/models/Helsinki-NLP/opus-mt-en-tl"
+        # Method 1: Try Facebook's NLLB model (recommended for Filipino)
+        try:
+            return self.translate_with_nllb(text)
+        except Exception as e:
+            print(f"NLLB translation failed: {str(e)}")
+        
+        # Method 2: Try MyMemory Translation API (free, no auth needed)
+        try:
+            return self.translate_with_mymemory(text)
+        except Exception as e:
+            print(f"MyMemory translation failed: {str(e)}")
+        
+        # If all methods fail
+        raise Exception("All translation methods failed. Please try again later.")
+    
+    def translate_with_nllb(self, text):
+        """
+        Use Facebook's NLLB (No Language Left Behind) model via HuggingFace.
+        Better for Filipino/Tagalog translation.
+        """
+        import requests
+        
+        # NLLB-200 model - supports Filipino well
+        API_URL = "https://api-inference.huggingface.co/models/facebook/nllb-200-distilled-600M"
         
         headers = {}
-        
-        # If you want to avoid rate limits, you can add a token (optional, still free)
-        # Get token from: https://huggingface.co/settings/tokens
-        # Uncomment below and set environment variable if needed:
-        # hf_token = os.environ.get("HUGGINGFACE_TOKEN")
-        # if hf_token:
-        #     headers["Authorization"] = f"Bearer {hf_token}"
+        hf_token = os.environ.get("HUGGINGFACE_TOKEN")
+        if hf_token:
+            headers["Authorization"] = f"Bearer {hf_token}"
         
         payload = {
             "inputs": text,
+            "parameters": {
+                "src_lang": "eng_Latn",  # English
+                "tgt_lang": "tgl_Latn"   # Tagalog (Filipino)
+            },
             "options": {
-                "wait_for_model": True  # Wait if model is loading
+                "wait_for_model": True,
+                "use_cache": True
             }
         }
         
-        try:
-            response = requests.post(API_URL, headers=headers, json=payload, timeout=30)
-            response.raise_for_status()
+        response = requests.post(API_URL, headers=headers, json=payload, timeout=60)
+        response.raise_for_status()
+        
+        result = response.json()
+        
+        # Handle response format
+        if isinstance(result, list) and len(result) > 0:
+            if isinstance(result[0], dict):
+                return result[0].get("translation_text", result[0].get("generated_text", ""))
+            elif isinstance(result[0], str):
+                return result[0]
+        elif isinstance(result, dict):
+            return result.get("translation_text", result.get("generated_text", ""))
+        
+        raise Exception(f"Unexpected API response format: {result}")
+    
+    def translate_with_mymemory(self, text):
+        """
+        Use MyMemory Translation API (free, no auth required).
+        Fallback method if HuggingFace fails.
+        """
+        import requests
+        from urllib.parse import quote
+        
+        # Split text into chunks if too long (MyMemory has 500 char limit per request)
+        max_chars = 500
+        if len(text) <= max_chars:
+            return self._translate_chunk_mymemory(text)
+        
+        # Split into sentences and translate in chunks
+        sentences = text.replace('! ', '!|').replace('? ', '?|').replace('. ', '.|').split('|')
+        translated_chunks = []
+        current_chunk = []
+        current_length = 0
+        
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if not sentence:
+                continue
             
-            result = response.json()
-            
-            # Handle different response formats
-            if isinstance(result, list) and len(result) > 0:
-                if isinstance(result[0], dict) and "translation_text" in result[0]:
-                    return result[0]["translation_text"]
-                elif isinstance(result[0], str):
-                    return result[0]
-            
-            # If we get here, unexpected format
-            raise Exception(f"Unexpected API response format: {result}")
-            
-        except requests.exceptions.Timeout:
-            raise Exception("Translation API timeout. Please try again.")
-        except requests.exceptions.RequestException as e:
-            # Check if it's a rate limit error
-            if hasattr(e.response, 'status_code') and e.response.status_code == 429:
-                raise Exception("Translation API rate limit reached. Please wait a moment and try again.")
-            raise Exception(f"Translation API error: {str(e)}")
+            if current_length + len(sentence) > max_chars and current_chunk:
+                # Translate current chunk
+                chunk_text = ' '.join(current_chunk)
+                translated_chunks.append(self._translate_chunk_mymemory(chunk_text))
+                current_chunk = [sentence]
+                current_length = len(sentence)
+            else:
+                current_chunk.append(sentence)
+                current_length += len(sentence) + 1
+        
+        # Translate remaining chunk
+        if current_chunk:
+            chunk_text = ' '.join(current_chunk)
+            translated_chunks.append(self._translate_chunk_mymemory(chunk_text))
+        
+        return ' '.join(translated_chunks)
+    
+    def _translate_chunk_mymemory(self, text):
+        """Helper to translate a single chunk with MyMemory API"""
+        import requests
+        from urllib.parse import quote
+        
+        # MyMemory free API
+        url = f"https://api.mymemory.translated.net/get?q={quote(text)}&langpair=en|tl"
+        
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        if data.get("responseStatus") == 200:
+            return data.get("responseData", {}).get("translatedText", "")
+        
+        raise Exception(f"MyMemory API error: {data.get('responseDetails', 'Unknown error')}")
     
     def send_success_response(self, data):
         """Send successful JSON response"""
