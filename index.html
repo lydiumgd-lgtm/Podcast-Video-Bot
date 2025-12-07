@@ -7,15 +7,21 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 800px;
+            max-width: 1000px;
             margin: 50px auto;
             padding: 20px;
+            background: #f9f9f9;
+        }
+        h1 {
+            color: #333;
         }
         .upload-section {
+            background: white;
             border: 2px dashed #ccc;
             padding: 30px;
             text-align: center;
             border-radius: 10px;
+            margin-bottom: 20px;
         }
         button {
             background: #0070f3;
@@ -26,10 +32,17 @@
             border-radius: 5px;
             cursor: pointer;
             margin-top: 10px;
+            margin-right: 10px;
         }
         button:disabled {
             background: #ccc;
             cursor: not-allowed;
+        }
+        button.secondary {
+            background: #28a745;
+        }
+        button.secondary:disabled {
+            background: #ccc;
         }
         .progress {
             display: none;
@@ -65,33 +78,104 @@
             color: green;
             margin-top: 10px;
         }
-        #output {
-            background: #f5f5f5;
-            padding: 15px;
-            border-radius: 5px;
-            margin-top: 20px;
-            max-height: 400px;
-            overflow-y: auto;
-            display: none;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-        }
         .file-info {
             margin-top: 10px;
             font-size: 14px;
             color: #666;
         }
+        .section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .section.active {
+            display: block;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+            gap: 10px;
+        }
+        .stat-card {
+            background: #f0f7ff;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            flex: 1;
+        }
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #0070f3;
+        }
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .part-card {
+            background: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        .part-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #0070f3;
+        }
+        .part-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #0070f3;
+        }
+        .part-meta {
+            font-size: 12px;
+            color: #666;
+        }
+        .part-content {
+            line-height: 1.6;
+            color: #333;
+        }
+        .collapsed {
+            display: none;
+        }
+        .expand-btn {
+            background: #666;
+            padding: 6px 12px;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        #extractedText {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 14px;
+            line-height: 1.5;
+        }
     </style>
 </head>
 <body>
     <h1>🎙️ Podcast Video Bot</h1>
-    <p>Upload a podcast transcript PDF to get started</p>
+    <p>Transform your podcast transcript into engaging Filipino short-form videos</p>
     
+    <!-- Step 1: Upload PDF -->
     <div class="upload-section">
-        <h2>Upload PDF</h2>
+        <h2>Step 1: Upload PDF Transcript</h2>
         <input type="file" id="fileInput" accept=".pdf" />
         <div class="file-info" id="fileInfo"></div>
-        <button onclick="uploadPDF()" id="uploadBtn">Process PDF</button>
+        <button onclick="uploadPDF()" id="uploadBtn">Extract Text</button>
     </div>
 
     <div class="progress" id="progress">
@@ -102,11 +186,54 @@
     </div>
 
     <div id="message"></div>
-    <pre id="output"></pre>
+
+    <!-- Step 2: View Extracted Text -->
+    <div class="section" id="extractedSection">
+        <h2>✅ Step 1 Complete: Text Extracted</h2>
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="charCount">0</div>
+                <div class="stat-label">Characters</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="wordCount">0</div>
+                <div class="stat-label">Words</div>
+            </div>
+        </div>
+        <details>
+            <summary style="cursor: pointer; padding: 10px; background: #f0f0f0; border-radius: 5px;">
+                📄 View Full Extracted Text
+            </summary>
+            <div id="extractedText" style="margin-top: 10px;"></div>
+        </details>
+        <button onclick="splitStory()" id="splitBtn" class="secondary">Split into Video Parts →</button>
+    </div>
+
+    <!-- Step 3: View Story Parts -->
+    <div class="section" id="partsSection">
+        <h2>✅ Step 2 Complete: Story Split into Parts</h2>
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="partCount">0</div>
+                <div class="stat-label">Video Parts</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="avgWords">0</div>
+                <div class="stat-label">Avg Words/Part</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="estimatedDuration">0</div>
+                <div class="stat-label">~Minutes/Video</div>
+            </div>
+        </div>
+        <div id="partsContainer"></div>
+        <button onclick="nextStep()" class="secondary">Continue to Translation →</button>
+    </div>
 
 <script>
-// File size limit (4MB for safety - Vercel has 4.5MB limit)
 const MAX_FILE_SIZE = 4 * 1024 * 1024;
+let extractedText = '';
+let storyParts = [];
 
 // Show file info when selected
 document.getElementById('fileInput').addEventListener('change', function(e) {
@@ -134,12 +261,11 @@ async function uploadPDF() {
     const progressFill = document.getElementById("progressFill");
     const status = document.getElementById("status");
     const message = document.getElementById("message");
-    const output = document.getElementById("output");
     
     // Reset UI
     message.innerHTML = '';
-    output.style.display = 'none';
-    output.textContent = '';
+    document.getElementById('extractedSection').classList.remove('active');
+    document.getElementById('partsSection').classList.remove('active');
     
     // Validation
     if (!file) {
@@ -153,11 +279,10 @@ async function uploadPDF() {
     }
     
     if (file.size > MAX_FILE_SIZE) {
-        message.innerHTML = '<div class="error">❌ File too large! Maximum size is 4MB.<br>Try compressing your PDF or splitting it into smaller files.</div>';
+        message.innerHTML = '<div class="error">❌ File too large! Maximum size is 4MB.</div>';
         return;
     }
     
-    // Disable button and show progress
     uploadBtn.disabled = true;
     progress.style.display = 'block';
     progressFill.style.width = '10%';
@@ -165,7 +290,6 @@ async function uploadPDF() {
     status.textContent = 'Reading PDF file...';
     
     try {
-        // Convert PDF to base64
         progressFill.style.width = '30%';
         progressFill.textContent = '30%';
         status.textContent = 'Encoding file...';
@@ -180,13 +304,12 @@ async function uploadPDF() {
             reader.readAsDataURL(file);
         });
         
-        // Send to backend with timeout
         progressFill.style.width = '50%';
         progressFill.textContent = '50%';
         status.textContent = 'Extracting text from PDF...';
         
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 25000);
         
         const res = await fetch("/api/extract_text", {
             method: "POST",
@@ -197,30 +320,33 @@ async function uploadPDF() {
         
         clearTimeout(timeoutId);
         
-        progressFill.style.width = '80%';
-        progressFill.textContent = '80%';
-        status.textContent = 'Processing response...';
-        
-        const data = await res.json();
-        
         progressFill.style.width = '100%';
         progressFill.textContent = '100%';
+        
+        const data = await res.json();
         
         if (data.error) {
             throw new Error(data.error);
         }
         
         if (!data.text || data.text.trim() === '') {
-            throw new Error('No text extracted from PDF. The PDF might be scanned images or empty.');
+            throw new Error('No text extracted from PDF.');
         }
         
         // Success!
         status.textContent = '✅ Complete!';
-        message.innerHTML = `<div class="success">✅ Successfully extracted ${data.text.length} characters from PDF!</div>`;
-        output.style.display = 'block';
-        output.textContent = data.text;
+        extractedText = data.text;
         
-        // Hide progress after 2 seconds
+        // Update stats
+        document.getElementById('charCount').textContent = data.characters.toLocaleString();
+        document.getElementById('wordCount').textContent = Math.round(data.characters / 5).toLocaleString();
+        document.getElementById('extractedText').textContent = data.text;
+        
+        // Show extracted section
+        document.getElementById('extractedSection').classList.add('active');
+        
+        message.innerHTML = `<div class="success">✅ Successfully extracted text from ${data.pages} pages!</div>`;
+        
         setTimeout(() => {
             progress.style.display = 'none';
         }, 2000);
@@ -231,18 +357,141 @@ async function uploadPDF() {
         progressFill.textContent = 'Error';
         
         let errorMsg = error.message;
-        
         if (error.name === 'AbortError') {
-            errorMsg = 'Request timeout. Your PDF is too large or complex to process. Try a smaller file.';
+            errorMsg = 'Request timeout. Try a smaller file.';
         }
         
         status.textContent = '❌ Failed';
         message.innerHTML = `<div class="error">❌ Error: ${errorMsg}</div>`;
-        
         console.error('Upload error:', error);
     } finally {
         uploadBtn.disabled = false;
     }
+}
+
+async function splitStory() {
+    const splitBtn = document.getElementById('splitBtn');
+    const progress = document.getElementById('progress');
+    const progressFill = document.getElementById('progressFill');
+    const status = document.getElementById('status');
+    const message = document.getElementById('message');
+    
+    if (!extractedText) {
+        message.innerHTML = '<div class="error">❌ No text to split!</div>';
+        return;
+    }
+    
+    splitBtn.disabled = true;
+    progress.style.display = 'block';
+    progressFill.style.background = '#28a745';
+    progressFill.style.width = '20%';
+    progressFill.textContent = '20%';
+    status.textContent = 'Cleaning transcript...';
+    
+    try {
+        progressFill.style.width = '50%';
+        progressFill.textContent = '50%';
+        status.textContent = 'Splitting into parts...';
+        
+        const res = await fetch("/api/split_story", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ 
+                text: extractedText,
+                target_words: 350  // 2-3 minute videos
+            })
+        });
+        
+        progressFill.style.width = '80%';
+        progressFill.textContent = '80%';
+        
+        const data = await res.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        progressFill.style.width = '100%';
+        progressFill.textContent = '100%';
+        status.textContent = '✅ Complete!';
+        
+        // Store parts
+        storyParts = data.parts;
+        
+        // Update stats
+        document.getElementById('partCount').textContent = data.part_count;
+        document.getElementById('avgWords').textContent = data.avg_words_per_part;
+        document.getElementById('estimatedDuration').textContent = Math.round(data.avg_words_per_part / 150);
+        
+        // Display parts
+        displayParts(data.parts);
+        
+        // Show parts section
+        document.getElementById('partsSection').classList.add('active');
+        
+        message.innerHTML = `<div class="success">✅ Created ${data.part_count} video parts!</div>`;
+        
+        setTimeout(() => {
+            progress.style.display = 'none';
+            progressFill.style.background = '#0070f3';
+        }, 2000);
+        
+    } catch (error) {
+        progressFill.style.width = '100%';
+        progressFill.style.background = '#ff4444';
+        progressFill.textContent = 'Error';
+        status.textContent = '❌ Failed';
+        message.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+        console.error('Split error:', error);
+    } finally {
+        splitBtn.disabled = false;
+    }
+}
+
+function displayParts(parts) {
+    const container = document.getElementById('partsContainer');
+    container.innerHTML = '';
+    
+    parts.forEach((part, index) => {
+        const wordCount = part.split(/\s+/).length;
+        const estimatedMinutes = Math.round(wordCount / 150 * 10) / 10;
+        
+        const partCard = document.createElement('div');
+        partCard.className = 'part-card';
+        partCard.innerHTML = `
+            <div class="part-header">
+                <div class="part-title">Part ${index + 1}</div>
+                <div class="part-meta">${wordCount} words • ~${estimatedMinutes} min</div>
+            </div>
+            <div class="part-content" id="part-${index}">
+                ${part.substring(0, 200)}${part.length > 200 ? '...' : ''}
+            </div>
+            ${part.length > 200 ? `
+                <button class="expand-btn" onclick="togglePart(${index})">
+                    Show Full Text
+                </button>
+            ` : ''}
+        `;
+        
+        container.appendChild(partCard);
+    });
+}
+
+function togglePart(index) {
+    const element = document.getElementById(`part-${index}`);
+    const btn = element.nextElementSibling;
+    
+    if (element.textContent.includes('...')) {
+        element.textContent = storyParts[index];
+        btn.textContent = 'Show Less';
+    } else {
+        element.textContent = storyParts[index].substring(0, 200) + '...';
+        btn.textContent = 'Show Full Text';
+    }
+}
+
+function nextStep() {
+    alert('Phase 3 (Translation) coming next! 🚀');
 }
 </script>
 </body>
