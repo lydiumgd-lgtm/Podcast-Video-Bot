@@ -17,6 +17,8 @@ class handler(BaseHTTPRequestHandler):
                 return
             
             parts = data["parts"]
+            batch_index = data.get("batch_index", 0)  # Which batch to process
+            batch_size = data.get("batch_size", 10)   # Parts per batch (default 10)
             
             if not isinstance(parts, list):
                 self.send_error_response(400, "'parts' must be an array")
@@ -26,34 +28,50 @@ class handler(BaseHTTPRequestHandler):
                 self.send_error_response(400, "Parts array cannot be empty")
                 return
             
-            # Translate all parts
-            translated_parts = []
+            # Calculate batch range
+            start_idx = batch_index * batch_size
+            end_idx = min(start_idx + batch_size, len(parts))
+            batch_parts = parts[start_idx:end_idx]
             
-            for i, part in enumerate(parts):
+            print(f"Processing batch {batch_index + 1}: parts {start_idx + 1} to {end_idx} of {len(parts)}", file=sys.stderr)
+            
+            # Translate batch
+            translated_batch = []
+            
+            for i, part in enumerate(batch_parts):
+                actual_index = start_idx + i
                 if not part or not part.strip():
-                    translated_parts.append("")
+                    translated_batch.append("")
                     continue
                 
                 try:
-                    print(f"Translating part {i+1}/{len(parts)}...", file=sys.stderr)
+                    print(f"Translating part {actual_index + 1}/{len(parts)}...", file=sys.stderr)
                     translated = self.translate_text(part)
-                    translated_parts.append(translated)
-                    print(f"Part {i+1} translated successfully", file=sys.stderr)
+                    translated_batch.append(translated)
+                    print(f"Part {actual_index + 1} translated successfully", file=sys.stderr)
                 except Exception as e:
-                    print(f"Part {i+1} failed: {str(e)}", file=sys.stderr)
-                    # If one part fails, return error
-                    self.send_error_response(500, f"Translation failed at part {i+1}: {str(e)}")
+                    print(f"Part {actual_index + 1} failed: {str(e)}", file=sys.stderr)
+                    self.send_error_response(500, f"Translation failed at part {actual_index + 1}: {str(e)}")
                     return
             
-            # Calculate statistics
-            original_chars = sum(len(part) for part in parts)
-            translated_chars = sum(len(part) for part in translated_parts)
+            # Calculate statistics for this batch
+            batch_original_chars = sum(len(part) for part in batch_parts)
+            batch_translated_chars = sum(len(part) for part in translated_batch)
+            
+            # Determine if more batches remain
+            has_more = end_idx < len(parts)
             
             response_data = {
-                "translated_parts": translated_parts,
-                "part_count": len(translated_parts),
-                "original_chars": original_chars,
-                "translated_chars": translated_chars
+                "translated_batch": translated_batch,
+                "batch_index": batch_index,
+                "batch_size": batch_size,
+                "batch_start": start_idx,
+                "batch_end": end_idx,
+                "total_parts": len(parts),
+                "has_more": has_more,
+                "next_batch_index": batch_index + 1 if has_more else None,
+                "original_chars": batch_original_chars,
+                "translated_chars": batch_translated_chars
             }
             
             self.send_success_response(response_data)

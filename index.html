@@ -563,43 +563,59 @@ async function translateStory() {
     translateBtn.disabled = true;
     progress.style.display = 'block';
     progressFill.style.background = '#28a745';
-    progressFill.style.width = '10%';
-    progressFill.textContent = '10%';
-    status.textContent = 'Preparing translation...';
+    progressFill.style.width = '0%';
+    progressFill.textContent = '0%';
+    status.textContent = 'Starting translation...';
     
     try {
-        progressFill.style.width = '30%';
-        progressFill.textContent = '30%';
-        status.textContent = `Translating ${storyParts.length} parts to Filipino...`;
+        const totalParts = storyParts.length;
+        const batchSize = 10; // Translate 10 parts at a time
+        const totalBatches = Math.ceil(totalParts / batchSize);
         
-        const res = await fetch("/api/translate_text", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-                parts: storyParts
-            })
-        });
+        translatedParts = []; // Reset
         
-        progressFill.style.width = '70%';
-        progressFill.textContent = '70%';
-        status.textContent = 'Processing translations...';
-        
-        const data = await res.json();
-        
-        if (data.error) {
-            throw new Error(data.error);
+        // Process each batch
+        for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+            const batchNum = batchIndex + 1;
+            const progressPercent = Math.round((batchIndex / totalBatches) * 100);
+            
+            progressFill.style.width = progressPercent + '%';
+            progressFill.textContent = progressPercent + '%';
+            status.textContent = `Translating batch ${batchNum}/${totalBatches} (parts ${batchIndex * batchSize + 1}-${Math.min((batchIndex + 1) * batchSize, totalParts)} of ${totalParts})...`;
+            
+            const res = await fetch("/api/translate_text", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ 
+                    parts: storyParts,
+                    batch_index: batchIndex,
+                    batch_size: batchSize
+                })
+            });
+            
+            const data = await res.json();
+            
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            
+            // Add translated batch to results
+            translatedParts.push(...data.translated_batch);
+            
+            console.log(`Batch ${batchNum}/${totalBatches} complete: ${data.translated_batch.length} parts translated`);
         }
         
         progressFill.style.width = '100%';
         progressFill.textContent = '100%';
         status.textContent = '✅ Complete!';
         
-        // Store translated parts
-        translatedParts = data.translated_parts;
+        // Calculate total stats
+        const originalChars = storyParts.join('').length;
+        const translatedChars = translatedParts.join('').length;
         
         // Update stats
-        document.getElementById('translatedCount').textContent = data.part_count;
-        document.getElementById('translatedChars').textContent = data.translated_chars.toLocaleString();
+        document.getElementById('translatedCount').textContent = translatedParts.length;
+        document.getElementById('translatedChars').textContent = translatedChars.toLocaleString();
         
         // Display translations
         displayTranslations(storyParts, translatedParts);
@@ -607,7 +623,7 @@ async function translateStory() {
         // Show translation section
         document.getElementById('translationSection').classList.add('active');
         
-        message.innerHTML = `<div class="success">✅ Successfully translated ${data.part_count} parts to Filipino!</div>`;
+        message.innerHTML = `<div class="success">✅ Successfully translated ${translatedParts.length} parts to Filipino!</div>`;
         
         setTimeout(() => {
             progress.style.display = 'none';
@@ -622,7 +638,7 @@ async function translateStory() {
         
         let errorMsg = error.message;
         if (errorMsg.includes('rate limit')) {
-            errorMsg += ' The free translation API has usage limits. Please wait 1-2 minutes and try again.';
+            errorMsg += ' The translation API has usage limits. Please wait 1-2 minutes and try again.';
         }
         
         message.innerHTML = `<div class="error">❌ Translation Error: ${errorMsg}</div>`;
