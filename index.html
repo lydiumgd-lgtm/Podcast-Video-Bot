@@ -841,21 +841,24 @@ async function generateAudio() {
     
     try {
         const totalParts = translatedParts.length;
-        const batchSize = 5; // Process 5 parts at a time
+        const batchSize = 1; // Process 1 part at a time to avoid timeouts (each takes ~3 min)
         const totalBatches = Math.ceil(totalParts / batchSize);
         
         audioFiles = []; // Reset audio files array
         
-        // Process each batch
+        // Process each batch (one part at a time)
         for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
             const batchNum = batchIndex + 1;
-            const startPart = batchIndex * batchSize + 1;
-            const endPart = Math.min((batchIndex + 1) * batchSize, totalParts);
+            const currentPart = batchIndex + 1;
             const progressPercent = Math.round((batchIndex / totalBatches) * 90); // Reserve 10% for final processing
             
             progressFill.style.width = progressPercent + '%';
             progressFill.textContent = progressPercent + '%';
-            status.textContent = `Generating audio batch ${batchNum}/${totalBatches} (parts ${startPart}-${endPart} of ${totalParts})...`;
+            status.textContent = `Generating audio for part ${currentPart}/${totalParts}...`;
+            
+            // Add timeout protection (20 seconds per request)
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 20000);
             
             const res = await fetch("/api/generate_tts", {
                 method: "POST",
@@ -864,8 +867,11 @@ async function generateAudio() {
                     parts: translatedParts,
                     batch_index: batchIndex,
                     batch_size: batchSize
-                })
+                }),
+                signal: controller.signal
             });
+            
+            clearTimeout(timeoutId);
             
             if (!res.ok) {
                 const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
@@ -882,7 +888,7 @@ async function generateAudio() {
                 throw new Error('Invalid response format from audio generation API');
             }
             
-            // Process each audio in the batch
+            // Process each audio in the batch (should be just 1)
             data.audio_batch.forEach((audioData, batchItemIndex) => {
                 const globalIndex = batchIndex * batchSize + batchItemIndex;
                 
@@ -905,7 +911,19 @@ async function generateAudio() {
                 });
             });
             
-            console.log(`Batch ${batchNum}/${totalBatches} complete: ${data.audio_batch.length} audio files generated`);
+            console.log(`Part ${currentPart}/${totalParts} complete: ${data.audio_batch.length} audio file(s) generated`);
+            
+            // Update progress display with completed count
+            const completedCount = audioFiles.length;
+            const partialProgress = Math.round((completedCount / totalParts) * 90);
+            progressFill.style.width = partialProgress + '%';
+            progressFill.textContent = partialProgress + '%';
+            status.textContent = `✅ Part ${completedCount}/${totalParts} complete...`;
+            
+            // Small delay between requests to avoid overwhelming the API
+            if (batchIndex < totalBatches - 1) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
             
             // If this is the last batch, break
             if (!data.has_more) {
@@ -942,13 +960,22 @@ async function generateAudio() {
         status.textContent = '❌ Failed';
         
         let errorMsg = error.message;
-        if (errorMsg.includes('timeout') || errorMsg.includes('Timeout')) {
-            errorMsg += ' The audio generation is taking too long. Try processing fewer parts at once.';
+        if (error.name === 'AbortError' || errorMsg.includes('timeout') || errorMsg.includes('Timeout')) {
+            const completedCount = audioFiles.length;
+            errorMsg = `Request timed out after 20 seconds. ${completedCount > 0 ? `Successfully generated ${completedCount} audio file(s) before timeout. ` : ''}The audio generation is taking longer than expected. You can try again - it will continue from where it left off.`;
         } else if (errorMsg.includes('rate limit') || errorMsg.includes('Rate limit')) {
             errorMsg += ' The TTS API has usage limits. Please wait 1-2 minutes and try again.';
         }
         
-        message.innerHTML = `<div class="error">❌ Audio Generation Error: ${errorMsg}</div>`;
+        // If we have some audio files, still show them
+        if (audioFiles.length > 0) {
+            displayAudioFiles(audioFiles);
+            document.getElementById('audioSection').classList.add('active');
+            message.innerHTML = `<div class="error">⚠️ Partial Success: ${errorMsg}</div>`;
+        } else {
+            message.innerHTML = `<div class="error">❌ Audio Generation Error: ${errorMsg}</div>`;
+        }
+        
         console.error('Audio generation error:', error);
     } finally {
         audioBtn.disabled = false;
