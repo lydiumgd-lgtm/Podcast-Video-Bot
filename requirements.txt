@@ -3,3 +3,4 @@ transformers==4.36.0
 gtts==2.5.0
 pillow==10.1.0
 requests==2.31.0
+sentencepiece==0.1.99
