@@ -1477,14 +1477,17 @@ async function createVideos() {
             const timeoutId = setTimeout(() => controller.abort(), 25000);
             
             // Prepare audio and image data for this batch (use stored base64)
+            const audioBase64 = audioFiles[batchIndex].base64 || (audioFiles[batchIndex].blob ? await blobToBase64(audioFiles[batchIndex].blob) : null);
+            const imageBase64 = imageFiles[batchIndex].base64 || (imageFiles[batchIndex].blob ? await blobToBase64(imageFiles[batchIndex].blob) : null);
+            
             const batchAudio = [{
-                audio: audioFiles[batchIndex].base64 || (audioFiles[batchIndex].blob ? await blobToBase64(audioFiles[batchIndex].blob) : null),
+                audio: audioBase64,
                 duration: audioFiles[batchIndex].duration,
                 size: audioFiles[batchIndex].size
             }];
             
             const batchImage = [{
-                image: imageFiles[batchIndex].base64 || (imageFiles[batchIndex].blob ? await blobToBase64(imageFiles[batchIndex].blob) : null),
+                image: imageBase64,
                 width: imageFiles[batchIndex].width,
                 height: imageFiles[batchIndex].height,
                 size: imageFiles[batchIndex].size
@@ -1846,13 +1849,13 @@ async function createLongVideo() {
         status.textContent = 'Preparing videos for concatenation...';
         
         // Prepare video data with base64
-        const videoDataForAPI = videoFiles.map(vf => ({
+        const videoDataForAPI = await Promise.all(videoFiles.map(async (vf) => ({
             video: vf.base64 || (vf.blob ? await blobToBase64(vf.blob) : null),
             duration: vf.duration,
             width: vf.width,
             height: vf.height,
             size: vf.size
-        }));
+        })));
         
         progressFill.style.width = '50%';
         progressFill.textContent = '50%';
